@@ -1,11 +1,5 @@
 <?php
 
-/*
- * YAuctionsFakeController: imita la API de YAuctions (Japon) para la demo.
- * En produccion YAuctions tendria su propia API; aca la simulo con el mismo
- * contrato para no depender de red externa. Expone el catalogo y la compra.
- */
-
 namespace App\Http\Controllers;
 
 use App\Models\Product;
@@ -14,10 +8,7 @@ use Illuminate\Http\Request;
 
 class YAuctionsFakeController extends Controller
 {
-    /**
-     * CATÁLOGO EXTERNO: espejos YAuctions con búsqueda por texto.
-     * Representa el "listado de subastas disponibles en Japón".
-     */
+    
     public function catalogo(Request $request): JsonResponse
     {
         $productos = Product::query()
@@ -42,12 +33,6 @@ class YAuctionsFakeController extends Controller
         ]);
     }
 
-    /**
-     * EJECUTAR COMPRA contra la interfaz de YAuctions.
-     * Idempotente por 'buyer_reference': si la orden ya se completó, se
-     * devuelve el MISMO acuse sin duplicar la venta (previene doble cargo
-     * ante reintentos de la cola).
-     */
     public function comprar(Request $request): JsonResponse
     {
         $datos = $request->validate([
@@ -75,7 +60,6 @@ class YAuctionsFakeController extends Controller
             ], 409);
         }
 
-        // Reserva atómica del lado del proveedor (descuenta el espejo).
         $producto->decrement('stock', $datos['quantity']);
 
         $acuse = 'YAU-' . strtoupper(substr(md5($datos['buyer_reference']), 0, 8));

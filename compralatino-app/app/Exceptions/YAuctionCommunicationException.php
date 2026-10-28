@@ -1,11 +1,5 @@
 <?php
 
-/*
- * Excepcion que lanzo cuando falla la comunicacion con YAuctions, para
- * diferenciarla de cualquier otro error. Lleva el contexto del fallo para
- * poder guardarlo en la auditoria de la orden.
- */
-
 namespace App\Exceptions;
 
 use Exception;
@@ -13,18 +7,9 @@ use Throwable;
 
 class YAuctionCommunicationException extends Exception
 {
-    /**
-     * Contexto completo del fallo: qué se envió, qué se recibió, error base.
-     * Se registrará en orders.datos_sincronizacion (bitácora de auditoría).
-     */
+    
     protected array $contexto = [];
 
-    /**
-     * @param string           $mensaje  Descripción legible del fallo de negocio.
-     * @param array            $contexto Payload/respuesta involucrados.
-     * @param int              $codigo   Estado HTTP o código interno.
-     * @param Throwable|null   $anterior Excepción técnica original (encadenamiento).
-     */
     public function __construct(
         string $mensaje = 'No fue posible comunicarse con la tienda externa YAuctions.',
         array $contexto = [],
@@ -35,17 +20,11 @@ class YAuctionCommunicationException extends Exception
         $this->contexto = $contexto;
     }
 
-    /** Accesor de la data de auditoría que usará el Job para persistirla. */
     public function contexto(): array
     {
         return $this->contexto;
     }
 
-    /**
-     * Fábrica estática: mejora la legibilidad en el punto de lanzamiento
-     * (self-documenting code):
-     *   throw YAuctionCommunicationException::porTimeout($payload, $e);
-     */
     public static function porTimeout(array $payload, ?Throwable $anterior = null): self
     {
         return new self(

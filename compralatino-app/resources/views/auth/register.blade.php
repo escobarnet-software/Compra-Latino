@@ -1,8 +1,4 @@
-{{--
-  Vista de REGISTRO (alta de cuentas multiplataforma, Fase III).
-  Campos = reglas de StoreRegisterRequest (cohesión validación↔presentación).
-  Accesible: label for + errores con role=alert junto al campo.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>

@@ -1,8 +1,4 @@
-{{--
-  Auditoria de fallos. Lista las ordenes que no se pudieron sincronizar con
-  YAuctions y muestra el detalle (JSON) que dejo el job cuando fallo, para que
-  un admin pueda revisar que paso.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>

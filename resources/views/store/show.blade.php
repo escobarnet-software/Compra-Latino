@@ -1,7 +1,4 @@
-{{--
-  Ficha del producto. Muestra el detalle y el formulario para elegir cantidad y
-  plataforma, que lleva al checkout a pagar con tarjeta.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -42,7 +39,7 @@
 
     <main>
         <div class="ficha">
-            {{-- INFORMACIÓN DEL PRODUCTO (modelo entregado por el controlador). --}}
+            
             <section class="panel" aria-labelledby="nombre-producto">
                 <span class="badge">{{ ucfirst($producto->plataforma) }}</span>
                 <h2 id="nombre-producto" style="margin:.5rem 0;">{{ $producto->nombre }}</h2>
@@ -58,24 +55,16 @@
                 </ul>
             </section>
 
-            {{--
-              FORMULARIO DE COMPRA: en vez de crear la orden directamente, lleva
-              al usuario al CHECKOUT con tarjeta (requisito Fase III "pagar con
-              tarjeta"). Usa GET para que la elección de cantidad y plataforma
-              viaje en la URL; el cobro con tarjeta se ingresa en el checkout.
-            --}}
             <section class="panel" aria-labelledby="titulo-compra">
                 <h2 id="titulo-compra">Realizar compra</h2>
 
                 <form method="GET" action="{{ route('store.checkout') }}">
                     <input type="hidden" name="product_id" value="{{ $producto->id }}">
 
-                    {{-- Cantidad: viaja al checkout (validada ahí como min:1 max:10). --}}
                     <label for="cantidad">Cantidad</label>
                     <input type="number" id="cantidad" name="cantidad"
                            value="{{ old('cantidad', 1) }}" min="1" max="10" required>
 
-                    {{-- Plataforma multiplataforma (dominio cerrado: local|yauctions). --}}
                     <label for="plataforma">Plataforma de compra</label>
                     <select id="plataforma" name="plataforma" required>
                         <option value="yauctions" @selected(old('plataforma', $producto->plataforma) === 'yauctions')>

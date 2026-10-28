@@ -1,8 +1,4 @@
-{{--
-  Productos recomendados para el usuario, ya ordenados por el motor segun su
-  historial. Muestro el puntaje de cada uno para que se entienda por que se lo
-  sugiero.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -57,7 +53,7 @@
                             </a>
                         </h2>
                         <p class="precio">{{ $producto->precioFormateado() }}</p>
-                        {{-- Explicabilidad: categoría afín + popularidad del producto. --}}
+                        
                         <p class="porque">
                             Sugerido por tu interés en <strong>{{ $producto->categoria }}</strong>
                             · {{ $producto->orders_count ?? 0 }} compra(s) de otros clientes.

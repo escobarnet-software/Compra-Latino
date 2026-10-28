@@ -1,7 +1,4 @@
-{{--
-  Historial de compras del usuario. Lista sus ordenes con el estado de cada
-  una. En el celular la tabla se desplaza de costado para que no se corte.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>

@@ -1,12 +1,5 @@
 <?php
 
-/*
- * Job ProcessYAuctionPurchase: procesa la compra en segundo plano.
- * Gracias a esto el usuario compra sin esperar: la orden queda 'pendiente' al
- * instante y este job habla con YAuctions despues. Envuelve las escrituras en
- * transacciones, reintenta si la red falla y deja la auditoria de cada intento.
- */
-
 namespace App\Jobs;
 
 use App\Exceptions\YAuctionCommunicationException;
@@ -24,70 +17,28 @@ use Throwable;
 
 class ProcessYAuctionPurchase implements ShouldQueue
 {
-    // Traits del framework: serialización, cola, reintentos y despacho.
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    /**
-     * REINTENTOS: número máximo de ejecuciones del job.
-     * Se acopla con backoff() para esperas crecientes entre intentos.
-     */
     public int $tries = 3;
 
-    /**
-     * La orden se serializa por IDENTIFICADOR en la cola (SerializesModels),
-     * evitando el "fat serialization" y permitiendo re-leerla en estado fresco.
-     *
-     * NOTA: se usa onQueue() en el constructor (patrón oficial de Laravel) para
-     * asignar la cola. NO debe definirse un método queue(): Laravel determina el
-     * nombre de la cola mediante la propiedad $queue del trait Queueable o el
-     * método onQueue(); un método queue() sería ignorado y el job caería en la
-     * cola por defecto ('default').
-     */
     public function __construct(
         public Order $order
     ) {
-        // Cola dedicada: permite escalar workers especializados .
         $this->onQueue('compras-yauctions');
     }
 
-    /**
-     * Espera exponencial entre reintentos (segundos):
-     * intento 1 → 30s, intento 2 → 120s, intento 3 → 300s.
-     * Estrategia estándar para no saturar la API externa ante caídas.
-     */
     public function backoff(): array
     {
         return [30, 120, 300];
     }
 
-    /**
-     * PUNTO DE EJECUCIÓN del job (lo invoca el worker de la cola).
-     *
-     * FLUJO RESILIENTE implementado:
-     *   [Transacción 1] bloquear orden + validar reglas de negocio
-     *          ↓
-     *   [HTTP] llamada a la API REST de YAuctions (FUERA de transacción)
-     *          ↓
-     *   [Transacción 2] persistir resultado + auditoría (commit/rollback)
-     *
-     * NOTA ACADÉMICA: la llamada HTTP se realiza deliberadamente FUERA de la
-     * transacción DB. Mantener un bloqueo (row-lock) abierto durante una
-     * llamada externa de segundos violaría las buenas prácticas ACID
-     * (largas transacciones = contención, deadlocks y timeouts de BD).
-     */
     public function handle(): void
     {
-        // FASE 1 — TRANSACCIÓN: marcar 'en_proceso' y validar invariantes.
-        // DB::transaction garantiza atomicidad: si algo falla, ROLLBACK.
         try {
             DB::transaction(function () {
-                // lockForUpdate(): bloqueo PESSIMISTA de la fila; evita que
-                // dos workers procesen la misma orden simultáneamente
-                // (condición de carrera clásica en colas).
                 $orden = Order::whereKey($this->order->id)->lockForUpdate()->firstOrFail();
 
                 if (! $orden->puedeSincronizarse()) {
-                    // Excepción de DOMINIO: regla de negocio violada.
                     throw YAuctionCommunicationException::porReglaDeNegocio(
                         "La orden #{$orden->id} ya fue procesada (estado: {$orden->estado}).",
                         ['orden_id' => $orden->id]
@@ -101,15 +52,10 @@ class ProcessYAuctionPurchase implements ShouldQueue
                 ], $this->attempts() ?: 1);
             });
         } catch (YAuctionCommunicationException $e) {
-            // La transacción ya hizo ROLLBACK automáticamente; se audita el fallo.
             $this->auditarFalla($e);
-            throw $e; // se propaga para que el gestor de colas registre el intento.
+            throw $e;
         }
 
-        // FASE 2 — LLAMADA A LA API REST EXTERNA (sin transacción abierta).
-        // ATAJO MULTIPLATAFORMA : las órdenes 'local' NO viajan a
-        // Japón; se confirman directamente (venta doméstica inmediata). Solo
-        // las órdenes 'yauctions' consumen la API REST externa.
         try {
             $ordenActual = Order::whereKey($this->order->id)->firstOrFail();
 
@@ -133,42 +79,23 @@ class ProcessYAuctionPurchase implements ShouldQueue
             $payload = $this->construirPayload();
 
             try {
-                // Http facade: cliente HTTP con timeouts y token de servicio.
-                // ESTRATEGIA POR DESTINO (requisito Fase III "ejecutar compras
-                // desde una interfaz prevista por YAuctions"): si la URL base
-                // apunta a ESTA misma app, se consume la INTERFAZ SIMULADA
-                // local (POST /simulador-yauctions/comprar); si apunta a un
-                // host externo real, se consume la API japonesa
-                // (POST /api/v1/purchases). Ambos caminos comparten el mismo
-                // try/catch + auditoría (por si algo sale mal idéntico).
                 $baseUrl = (string) config('services.yauctions.url');
                 $esSimuladorLocal = str_contains($baseUrl, '127.0.0.1:8000')
                     || str_contains($baseUrl, 'localhost:8000');
 
                 if ($esSimuladorLocal) {
-                    // Interfaz prevista por YAuctions (simulador local).
                     $respuesta = Http::baseUrl($baseUrl)
                         ->timeout(15)
                         ->post('/simulador-yauctions/comprar', $payload);
                 } else {
-                    // API REST real de la tienda japonesa.
                     $respuesta = Http::baseUrl($baseUrl)
                         ->withToken(config('services.yauctions.token'))
                         ->timeout(15)
                         ->post('/api/v1/purchases', $payload);
                 }
             } catch (ConnectionException $conexion) {
-                // Un fallo de RED (host inaccesible, timeout, DNS) lo convertimos
-                // en una EXCEPCIÓN DE DOMINIO tipada. Así el catch externo la
-                // audita igual que un error HTTP y queda trazable en el BI
-                // (defensa: toda falla de comunicación debe quedar registrada).
                 throw YAuctionCommunicationException::porTimeout($payload, $conexion);
             } catch (Throwable $conexion) {
-                // NOTA: Guzzle puede lanzar ConnectException directamente (sin
-                // envolver en ConnectionException de Laravel) ante un host
-                // inaccesible. Este catch genérico garantiza que NINGÚN fallo
-                // de red escape sin convertirse en excepción de dominio
-                // auditada (por si algo sale mal: mejor auditar de más que perder traza).
                 if ($this->esFalloDeConexion($conexion)) {
                     throw YAuctionCommunicationException::porTimeout($payload, $conexion);
                 }
@@ -176,7 +103,6 @@ class ProcessYAuctionPurchase implements ShouldQueue
             }
 
             if ($respuesta->failed()) {
-                // Convierte el fallo HTTP en EXCEPCIÓN DE DOMINIO tipada.
                 throw YAuctionCommunicationException::porErrorHttp(
                     $respuesta->status(),
                     $respuesta->json(),
@@ -187,8 +113,6 @@ class ProcessYAuctionPurchase implements ShouldQueue
             $referenciaExterna = $respuesta->json('purchase_id')
                 ?? $respuesta->json('external_reference');
 
-            // FASE 3 — TRANSACCIÓN: confirmar la orden con su acuse externo.
-            // Solo aquí la BD refleja el éxito COMPLETO del proceso (commit).
             DB::transaction(function () use ($referenciaExterna, $payload, $respuesta) {
                 $orden = Order::whereKey($this->order->id)->firstOrFail();
 
@@ -204,13 +128,9 @@ class ProcessYAuctionPurchase implements ShouldQueue
                 ], $this->attempts() ?: 1);
             });
         } catch (YAuctionCommunicationException $e) {
-            // Excepción de NEGOCIO: API inaccesible, HTTP 4xx/5xx o regla violada.
-            // Se audita el detalle completo para el panel de BI y se relanza
-            // para activar el mecanismo de REINTENTOS (backoff exponencial).
             $this->auditarFalla($e);
             throw $e;
         } catch (Throwable $e) {
-            // Excepción TÉCNICA no prevista (red caída, BD no disponible...).
             Log::critical('Fallo técnico inesperado en sincronización YAuctions', [
                 'orden_id' => $this->order->id,
                 'error'    => $e->getMessage(),
@@ -219,11 +139,6 @@ class ProcessYAuctionPurchase implements ShouldQueue
         }
     }
 
-    /**
-     * CALLBACK DE FALLO TERMINAL: se ejecuta cuando se agotan los $tries.
-     * Deja la orden en estado 'fallida' CONSISTENTE y con auditoría completa,
-     * habilitando la supervisión administrativa desde el panel de BI.
-     */
     public function failed(?Throwable $exception): void
     {
         DB::transaction(function () use ($exception) {
@@ -245,13 +160,6 @@ class ProcessYAuctionPurchase implements ShouldQueue
         ]);
     }
 
-    // MÉTODOS PRIVADOS — metodos de apoyo
-
-    /**
-     * Construye el DTO (Data Transfer Object) que viajará por la red.
-     * Se serializa SOLO lo necesario: nunca se envía el objeto Eloquent
-     * completo (principio de mínimo conocimiento / no exponer más datos).
-     */
     private function construirPayload(): array
     {
         return [
@@ -263,11 +171,6 @@ class ProcessYAuctionPurchase implements ShouldQueue
         ];
     }
 
-    /**
-     * ¿La excepción proviene de la capa de RED (DNS, TCP, TLS, timeout)?
-     * Detecta las clases de Guzzle/HttpClient por nombre para no acoplar
-     * el Job a imports concretos del driver HTTP (bajo acoplamiento).
-     */
     private function esFalloDeConexion(Throwable $e): bool
     {
         $clase = get_class($e);
@@ -278,11 +181,6 @@ class ProcessYAuctionPurchase implements ShouldQueue
             || str_contains($clase, 'TransferException');
     }
 
-    /**
-     * Registra la data de AUDITORÍA del fallo de comunicación (requisito Fase III):
-     * qué se envió, qué respondió la tienda y por qué se falló. Todo persistido
-     * en la propia orden (JSON) + log del framework para trazabilidad técnica.
-     */
     private function auditarFalla(YAuctionCommunicationException $e): void
     {
         $orden = Order::find($this->order->id);

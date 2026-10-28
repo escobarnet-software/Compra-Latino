@@ -1,13 +1,5 @@
 <?php
 
-/*
- * Seeder de datos de demostracion.
- * Crea usuarios (un admin y varios clientes), un catalogo que mezcla productos
- * locales y de YAuctions, y ordenes en los distintos estados repartidas en el
- * ultimo mes. Con esto el panel de BI y las recomendaciones se ven con datos
- * reales en vez de vacios.
- */
-
 namespace Database\Seeders;
 
 use App\Models\Order;
@@ -19,14 +11,9 @@ use Illuminate\Support\Facades\Hash;
 
 class DemoDataSeeder extends Seeder
 {
-    /**
-     * Punto de entrada del seeder. Usa TRANSACCIONES implícitas de Eloquent
-     * por lote y para armar los datos deterministas-ish para que cada ejecución
-     * produzca un panel de BI con datos plausibles.
-     */
+    
     public function run(): void
     {
-        // ---- 1. CUENTA ADMINISTRATIVA (protege el panel de BI) ----
         User::create([
             'name'                 => 'Ana Torres (Administradora BI)',
             'email'                => 'admin@compralatino.test',
@@ -35,7 +22,6 @@ class DemoDataSeeder extends Seeder
             'plataforma_preferida' => 'yauctions',
         ]);
 
-        // ---- 2. CLIENTES DE DEMOSTRACIÓN ----
         $nombres = [
             'Luis Ramírez', 'María Quispe', 'Carlos Medina', 'Lucía Fernández',
             'Jorge Salas', 'Carmen Rojas', 'Diego Paredes', 'Valeria Nuñez',
@@ -49,30 +35,19 @@ class DemoDataSeeder extends Seeder
             'plataforma_preferida' => $i % 2 === 0 ? 'yauctions' : 'local',
         ]));
 
-        // ---- 3. CATÁLOGO MULTIPLATAFORMA ----
         $productos = $this->crearCatalogo();
 
-        // ---- 4. VENTAS SIMULADAS DE LOS ÚLTIMOS 30 DÍAS ----
         $ordenes = $this->simularVentas($clientes, $productos);
 
-        // ---- 5. BITÁCORA DE COMPORTAMIENTO (alimenta el recomendador) ----
         $this->sembrarHistorial($clientes, $productos, $ordenes);
 
         $this->command?->info('Datos de demostración creados: 9 usuarios, '
             . $productos->count() . ' productos, ' . $ordenes->count() . ' órdenes.');
     }
 
-    // MÉTODOS PRIVADOS — para armar los datos
-
-    /**
-     * CATÁLOGO MULTIPLATAFORMA: ~60% espejos de YAuctions (Japón) y ~40%
-     * inventario local. Demuestra que un mismo modelo representa productos
-     * de distintas tiendas (requerimiento "compras multiplataforma").
-     */
     private function crearCatalogo(): \Illuminate\Support\Collection
     {
         $definiciones = [
-            // [nombre, categoria, precio, plataforma]
             ['Cámara Fujifilm X-T5',           'electronica', 189000, 'yauctions'],
             ['Teclado mecánico Keychron Q1',   'electronica',  24500, 'yauctions'],
             ['Monitor LG UltraGear 27"',       'electronica',  52000, 'local'],
@@ -97,7 +72,7 @@ class DemoDataSeeder extends Seeder
             'sku'          => 'CL-' . str_pad((string) ($i + 1), 4, '0', STR_PAD_LEFT),
             'nombre'       => $d[0],
             'descripcion'  => "Producto de demostración de la categoría {$d[1]}.",
-            'precio'       => $d[2], // moneda única JPY para simplificar la analítica BI
+            'precio'       => $d[2],
             'moneda'       => 'JPY',
             'plataforma'   => $d[3],
             'external_id'  => $d[3] === 'yauctions' ? 'YA-' . (100000 + $i) : null,
@@ -107,29 +82,19 @@ class DemoDataSeeder extends Seeder
         ]));
     }
 
-    /**
-     * SIMULACIÓN DE VENTAS (30 días): genera órdenes distribuidas en el tiempo
-     * con una MEZCLA REALISTA de estados:
-     *   • ~75% completadas (con acuse external_reference de YAuctions)
-     *   • ~10% fallidas (con JSON de auditoría de fallo de comunicación)
-     *   • ~10% pendientes y ~5% en proceso (simulan la cola activa)
-     * Esto alimenta el gráfico de serie temporal y el KPI de salud del BI.
-     */
     private function simularVentas(\Illuminate\Support\Collection $clientes, \Illuminate\Support\Collection $productos): \Illuminate\Support\Collection
     {
         $ordenes = collect();
 
         foreach (range(1, 30) as $dia) {
-            // Entre 1 y 4 órdenes por día (patrón de negocio no uniforme).
             foreach (range(1, random_int(1, 4)) as $i) {
                 $producto = $productos->random();
                 $cantidad = random_int(1, 3);
                 $cliente  = $clientes->random();
                 $fecha    = now()->subDays($dia - 1)->setTime(random_int(8, 20), random_int(0, 59));
 
-                // Distribución ponderada de estados (semilla de demostración).
                 $estado = match (true) {
-                    $dia <= 2 && $i === 1    => Order::ESTADO_PENDIENTE, // cola reciente
+                    $dia <= 2 && $i === 1    => Order::ESTADO_PENDIENTE,
                     $dia <= 2 && $i === 2    => Order::ESTADO_EN_PROCESO,
                     random_int(1, 100) <= 10 => Order::ESTADO_FALLIDA,
                     default                  => Order::ESTADO_COMPLETADA,
@@ -146,10 +111,8 @@ class DemoDataSeeder extends Seeder
                     'plataforma'     => $producto->plataforma,
                 ]);
 
-                // Simular la fecha real de creación (spread para el gráfico BI).
                 $orden->forceFill(['created_at' => $fecha, 'updated_at' => $fecha])->save();
 
-                // AUDITORÍA Y ACUSES según el estado alcanzado.
                 if ($estado === Order::ESTADO_COMPLETADA) {
                     $orden->forceFill([
                         'external_reference'   => 'YAU-' . random_int(100000, 999999),
@@ -164,8 +127,6 @@ class DemoDataSeeder extends Seeder
                 }
 
                 if ($estado === Order::ESTADO_FALLIDA) {
-                    // Caso emblemático de la Fase III: fallo de comunicación
-                    // con la API REST registrado como bitácora de auditoría.
                     $orden->forceFill([
                         'datos_sincronizacion' => [[
                             'fase'     => 'fallo_comunicacion',
@@ -186,33 +147,22 @@ class DemoDataSeeder extends Seeder
         return $ordenes;
     }
 
-    /**
-     * BITÁCORA DE COMPORTAMIENTO: genera vistas, carritos, compras y
-     * RECOMENDACIONES (algunas convertidas y otras no) para que el motor de
-     * recomendaciones y el KPI de conversión del BI tengan datos reales.
-     */
     private function sembrarHistorial(\Illuminate\Support\Collection $clientes, \Illuminate\Support\Collection $productos, \Illuminate\Support\Collection $ordenes): void
     {
         foreach ($clientes as $cliente) {
-            // Vistas aleatorias (señales débiles de interés).
             foreach ($productos->random(6) as $producto) {
                 UserHistory::registrar($cliente->id, $producto->id, UserHistory::EVENTO_VISTA);
             }
 
-            // Algunos carritos (señal media de intención).
             foreach ($productos->random(2) as $producto) {
                 UserHistory::registrar($cliente->id, $producto->id, UserHistory::EVENTO_CARRITO);
             }
 
-            // Compras registradas en la bitácora (señal fuerte; refleja órdenes).
             $ordenesCliente = $ordenes->where('user_id', $cliente->id);
             foreach ($ordenesCliente->take(5) as $orden) {
                 UserHistory::registrar($cliente->id, $orden->product_id, UserHistory::EVENTO_COMPRA);
             }
 
-            // RECOMENDACIONES entregadas: algunas apuntan a productos que el
-            // usuario SÍ terminó comprando (conversión real en el KPI de BI)
-            // y otras no (para que la tasa no sea artificialmente del 100%).
             $convertidas = $ordenesCliente->pluck('product_id')->unique()->take(2);
 
             foreach ($convertidas as $productId) {

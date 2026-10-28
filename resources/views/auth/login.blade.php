@@ -1,8 +1,4 @@
-{{--
-  Vista de LOGIN mínima (solo demostración local; no forma parte del código
-  fuente académico de la Fase III). Diseño responsive mobile-first consistente
-  con el resto del sistema y accesible (label for + role de estado de error).
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>

@@ -1,8 +1,4 @@
-{{--
-  Seguimiento de una orden. Mientras la orden esta pendiente o en proceso la
-  pagina se recarga sola cada 4 segundos, asi se ve como el job va cambiando el
-  estado en segundo plano. El usuario nunca espera a YAuctions.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -10,11 +6,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orden #{{ $orden->id }} · CompraLatino</title>
 
-    {{--
-      AUTO-REFRESCO: solo mientras la orden está en tránsito por la cola.
-      Demuestra la desincronización temporal entre la respuesta HTTP
-      instantánea y el trabajo diferido del Job en la cola.
-    --}}
     @if (in_array($orden->estado, ['pendiente', 'en_proceso']))
         <meta http-equiv="refresh" content="4">
     @endif
@@ -64,7 +55,6 @@
         <section class="panel" aria-labelledby="titulo-orden">
             <h2 id="titulo-orden">Orden #{{ $orden->id }}</h2>
 
-            {{-- ESTADO ACTUAL: refleja lo que el Job escribe en la BD. --}}
             <p style="margin-top:.6rem;">
                 Estado:
                 <span class="estado {{ $orden->estado }}" role="status">
@@ -72,10 +62,6 @@
                 </span>
             </p>
 
-            {{--
-              LÍNEA DE TIEMPO DEL CICLO DE VIDA: comunica al usuario en qué
-              fase se encuentra el proceso asíncrono (retroalimentación).
-            --}}
             <ol class="timeline">
                 <li class="ok">
                     <strong>Orden recibida</strong><br>
@@ -103,7 +89,6 @@
                 </li>
             </ol>
 
-            {{-- DETALLE ECONÓMICO de la compra. --}}
             <dl>
                 <dt>Producto</dt>
                 <dd>{{ $orden->product->nombre ?? '—' }}</dd>
@@ -118,11 +103,6 @@
             </dl>
         </section>
 
-        {{--
-          NOTA ACADÉMICA: la auditoría JSON (datos_sincronizacion) NO se muestra
-          aquí por seguridad ($hidden en el modelo); es información interna
-          visible solo para administradores en el panel de auditoría de BI.
-        --}}
     </main>
 </body>
 </html>

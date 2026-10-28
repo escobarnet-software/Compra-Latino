@@ -1,14 +1,10 @@
-{{--
-  Panel de Inteligencia de Negocios. Muestra los KPIs del negocio, las ventas
-  por plataforma, los productos mas vendidos y cuan efectivo es el recomendador.
-  Es responsive y accesible: funciona bien en computadora, tablet y celular.
---}}
+
 <!DOCTYPE html>
-{{-- lang="es": clave para lectores de pantalla y buscadores. --}}
+
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    {{-- Viewport: habilita el layout responsivo en móviles. --}}
+    
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel de Inteligencia de Negocios · CompraLatino</title>
 
@@ -134,18 +130,17 @@
     </style>
 </head>
 <body>
-    {{-- Skip-link: accesibilidad por teclado (WCAG 2.4.1). --}}
+    
     <a class="skip-link" href="#contenido">Saltar al contenido principal</a>
 
-    {{-- ENCABEZADO: elemento semántico <header>; identifica la región global. --}}
     <header class="app-header">
         <h1>CompraLatino · Panel de Inteligencia de Negocios</h1>
-        {{-- {{ }} escapado por Blade: previene XSS (Cross-Site Scripting). --}}
+        
         <p>Hola, {{ auth()->user()->name ?? 'Administrador' }}</p>
     </header>
 
     <div class="app-layout">
-        {{-- NAVEGACIÓN: <nav> con aria-label para lectores de pantalla. --}}
+        
         <nav class="app-nav" aria-label="Navegación administrativa">
             <ul>
                 <li><a href="{{ route('bi.dashboard') }}" aria-current="page">Panel BI</a></li>
@@ -154,62 +149,49 @@
             </ul>
         </nav>
 
-        {{-- <main> identifica el contenido único de la página (accesibilidad). --}}
         <main class="app-main" id="contenido">
 
-            {{-- Mensaje flash de sesión (retroalimentación al usuario). --}}
             @if (session('status'))
                 <p role="status" class="panel">{{ session('status') }}</p>
             @endif
 
-            {{--
-              SECCIÓN KPI:  → los indicadores críticos ocupan la
-              primera pantalla para una lectura rápida de la salud del negocio.
-            --}}
             <section class="kpi-grid" aria-label="Indicadores clave de rendimiento">
-                {{-- KPI 1 — Ingresos totales (medida principal de BI). --}}
+                
                 <article class="kpi-card exito">
                     <p class="etiqueta">Ingresos (30 días)</p>
                     <p class="valor">{{ number_format((float) ($resumenVentas->ingresos ?? 0), 2) }}</p>
                 </article>
 
-                {{-- KPI 2 — Volumen de ventas efectivas. --}}
                 <article class="kpi-card">
                     <p class="etiqueta">Órdenes completadas</p>
                     <p class="valor">{{ $resumenVentas->ordenes ?? 0 }}</p>
                 </article>
 
-                {{-- KPI 3 — Ticket promedio (decisión comercial). --}}
                 <article class="kpi-card">
                     <p class="etiqueta">Ticket promedio</p>
                     <p class="valor">{{ number_format((float) $ticketPromedio, 2) }}</p>
                 </article>
 
-                {{-- KPI 4 — Efectividad del motor de recomendaciones (IA). --}}
                 <article class="kpi-card exito">
                     <p class="etiqueta">Conversión recomendaciones</p>
                     <p class="valor">{{ $tasaConversionRecomendaciones }}%</p>
                 </article>
 
-                {{-- KPI 5 — Alerta: fallos de sincronización con YAuctions. --}}
                 <article class="kpi-card {{ $fallasSincronizacion > 0 ? 'alerta' : '' }}">
                     <p class="etiqueta">Fallos de sincronización</p>
                     <p class="valor">{{ $fallasSincronizacion }}</p>
                 </article>
 
-                {{-- KPI 6 — Base de usuarios. --}}
                 <article class="kpi-card">
                     <p class="etiqueta">Usuarios registrados</p>
                     <p class="valor">{{ $totalUsuarios }}</p>
                 </article>
 
-                {{-- KPI 7 — Catálogo activo. --}}
                 <article class="kpi-card">
                     <p class="etiqueta">Productos activos</p>
                     <p class="valor">{{ $productosActivos }}</p>
                 </article>
 
-                {{-- KPI 8 — Salud de la cola (pendientes + en proceso). --}}
                 <article class="kpi-card">
                     <p class="etiqueta">En cola de sincronización</p>
                     <p class="valor">
@@ -218,12 +200,6 @@
                 </article>
             </section>
 
-            {{--
-              GRÁFICO DE SERIES TEMPORALES: ingresos diarios (últimos 30 días).
-              Implementado con CSS puro (sin librerías externas). Cada barra
-              lleva un <span> visible: la información NO depende solo del color
-              o la altura (accesibilidad WCAG 1.4.1).
-            --}}
             <section class="panel" aria-labelledby="titulo-ventas-dia">
                 <h2 id="titulo-ventas-dia">Ingresos diarios (últimos 30 días)</h2>
                 @php
@@ -243,11 +219,6 @@
                 </div>
             </section>
 
-            {{--
-              DIMENSIÓN MULTILATAFORMA : comparativa de desempeño
-              entre inventario local y la tienda externa YAuctions. Tabla
-              semántica con <caption> y <scope> (accesibilidad de datos).
-            --}}
             <section class="panel" aria-labelledby="titulo-plataformas">
                 <h2 id="titulo-plataformas">Rendimiento por plataforma</h2>
                 <div class="tabla-contenedor">
@@ -275,11 +246,6 @@
                 </div>
             </section>
 
-            {{--
-              TOP PRODUCTOS: ranking de mayor a menor ingreso. La teoría de
-              interacción señala que los rankings aceleran la decisión
-              (reducción de carga cognitiva; principio de Hick aplicado).
-            --}}
             <section class="panel" aria-labelledby="titulo-top">
                 <h2 id="titulo-top">Top 5 productos por ingreso</h2>
                 <div class="tabla-contenedor">
@@ -298,7 +264,7 @@
                             @forelse ($topProductos as $indice => $producto)
                                 <tr>
                                     <td>{{ $indice + 1 }}</td>
-                                    {{-- Escapado de Blade: protección XSS. --}}
+                                    
                                     <td>{{ $producto->nombre }}</td>
                                     <td>{{ $producto->categoria }}</td>
                                     <td>{{ $producto->unidades }}</td>
@@ -312,12 +278,6 @@
                 </div>
             </section>
 
-            {{--
-              PANEL IA — EFECTIVIDAD DEL MOTOR DE RECOMENDACIONES .
-              Presenta las métricas estructuradas devueltas por la Capa de
-              Negocio (RecommendationService::reporteDeEfectividad) para que
-              el administrador evalúe el retorno de la inteligencia aplicada.
-            --}}
             <section class="panel" aria-labelledby="titulo-ia">
                 <h2 id="titulo-ia">Motor de recomendaciones · Efectividad</h2>
                 <div class="tabla-contenedor">
@@ -343,7 +303,6 @@
         </main>
     </div>
 
-    {{-- <footer>: región semántica para metadatos del sistema (BI/Académico). --}}
     <footer class="app-header">
         <p>CompraLatino — Fase III · Arquitectura por capas · Datos al: {{ now()->format('d/m/Y H:i') }}</p>
     </footer>

@@ -1,9 +1,4 @@
-{{--
-  Catalogo de la tienda. Muestra el buscador, los productos recomendados para
-  el usuario y el listado completo paginado. Cada "Comprar" lleva al checkout
-  para ingresar la tarjeta. Es responsive: en el celular va a una columna y se
-  va ampliando en pantallas mas grandes.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -57,11 +52,11 @@
             <span>{{ auth()->user()->name }}</span>
             <a href="{{ route('store.recommendations') }}">✨ Para ti</a>
             <a href="{{ route('orders.index') }}">Mis órdenes</a>
-            {{-- Panel BI visible solo para administradores (autorización por vista). --}}
+            
             @if (auth()->user()->esAdministrador())
                 <a href="{{ route('bi.dashboard') }}">Panel BI</a>
             @endif
-            {{-- Cierre de sesión vía POST con CSRF (anti-forgery; nunca por GET). --}}
+            
             <form method="POST" action="{{ route('logout') }}" style="display:inline;">
                 @csrf
                 <button type="submit" style="background:none;border:0;color:#dbeafe;cursor:pointer;font:inherit;margin-left:1rem;min-height:44px;">Salir</button>
@@ -70,12 +65,7 @@
     </header>
 
     <main>
-        {{--
-          BUSCADOR (requisito Fase III "buscar productos"): formulario GET con
-          texto libre + filtros de categoría y plataforma. Al ser GET, la
-          búsqueda es COMPARTIBLE por URL y no muta estado (REST idempotente).
-          role="search" identifica la región para lectores de pantalla.
-        --}}
+        
         <section aria-label="Buscar productos">
             <form method="GET" action="{{ route('store.index') }}" role="search"
                   style="display:flex;flex-wrap:wrap;gap:.5rem;background:#fff;padding:.9rem;border-radius:12px;box-shadow:0 1px 3px rgba(15,23,42,.12);margin-bottom:1rem;">
@@ -108,24 +98,10 @@
             @endif
         </section>
 
-        {{-- Retroalimentación de la compra procesada (flash message del PRG). --}}
         @if (session('status'))
             <p class="exito-flash" role="status">{{ session('status') }}</p>
         @endif
 
-        {{--
-          NOTA: el catálogo YA no procesa compras directas (todo pasa por el
-          checkout con tarjeta). Por eso eliminamos el bloque antiguo
-          "Revisa tu compra" que mostraba errores de validación aquí: los
-          errores de pago ahora se muestran SOLO en el checkout, junto al campo
-          que el usuario debe corregir (UX + capa de presentación coherente).
-        --}}
-
-        {{--
-          SECCIÓN DE RECOMENDACIONES : generadas por la Capa de
-          Negocio (RecommendationService). Cada tarjeta muestra el puntaje de
-          afinidad calculado — el usuario ve POR QUÉ se le sugiere el producto.
-        --}}
         @if ($recomendaciones->isNotEmpty())
             <section aria-labelledby="titulo-reco">
                 <h2 id="titulo-reco">✨ Recomendados para ti</h2>
@@ -143,10 +119,6 @@
             </section>
         @endif
 
-        {{--
-          CATÁLOGO GENERAL: paginado por el controlador (rendimiento). La
-          paginación de Blade genera los enlaces "Anterior/Siguiente".
-        --}}
         <section aria-labelledby="titulo-catalogo">
             <h2 id="titulo-catalogo">Catálogo completo</h2>
             <div class="grid">
@@ -154,7 +126,7 @@
                     <article class="card">
                         <span class="badge {{ $producto->plataforma }}">{{ ucfirst($producto->plataforma) }}</span>
                         <h3>
-                            {{-- Ficha de producto: registra evento 'vista' en la bitácora. --}}
+                            
                             <a href="{{ route('store.show', $producto) }}" style="color:inherit;text-decoration:none;">
                                 {{ $producto->nombre }}
                             </a>
@@ -165,7 +137,6 @@
                             Stock: {{ $producto->stock }} · {{ $producto->orders_count }} venta(s)
                         </p>
 
-                        {{-- Compra con tarjeta: 1 unidad; el pago se ingresa en el checkout. --}}
                         <a class="btn" style="margin-top:auto;" href="{{ route('store.checkout', ['product_id' => $producto->id, 'cantidad' => 1, 'plataforma' => $producto->plataforma]) }}">Comprar</a>
                     </article>
                 @empty
@@ -173,7 +144,6 @@
                 @endforelse
             </div>
 
-            {{-- Paginación (enlaces generados por el paginator de Laravel). --}}
             <nav class="paginacion" aria-label="Paginación del catálogo">
                 {{ $productos->links() }}
             </nav>

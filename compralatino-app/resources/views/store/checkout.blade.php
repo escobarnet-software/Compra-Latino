@@ -1,8 +1,4 @@
-{{--
-  Pago con tarjeta. A la izquierda el resumen de lo que pago y a la derecha el
-  formulario de la tarjeta. El numero y el CVV no se vuelven a mostrar si hay un
-  error. Tarjeta de prueba que aprueba: 4242 4242 4242 4242.
---}}
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
